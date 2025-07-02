@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, api } from '../../lib/supabase'
 import { User } from '@supabase/supabase-js'
-import Auth from '../components/Auth'
+import AuthComponent from '../components/Auth'
 import TodoApp from '../components/TodoApp'
 
 export default function Home() {
@@ -61,5 +61,5 @@ export default function Home() {
     )
   }
 
-  return user ? <TodoApp user={user} /> : <Auth />
+  return user ? <TodoApp user={user} /> : <AuthComponent />
 }
