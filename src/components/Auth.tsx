@@ -46,8 +46,8 @@ export default function AuthComponent() {
         if (error) throw error
         setMessage('로그인 성공!')
       }
-    } catch (error: any) {
-      setMessage(error.message)
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : '오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -74,9 +74,9 @@ export default function AuthComponent() {
         throw error
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Google 로그인 실패:', error)
-      setMessage(`Google 로그인 오류: ${error.message}`)
+      setMessage(`Google 로그인 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
       setLoading(false)
     }
   }

@@ -1,4 +1,5 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { User } from '@supabase/auth-helpers-nextjs'
 
 export const supabase = createClientComponentClient()
 
@@ -31,7 +32,7 @@ export interface MissionCompletion {
 // API 함수들
 export const api = {
   // 프로필 생성 또는 가져오기
-  async ensureProfile(user: any) {
+  async ensureProfile(user: User) {
     try {
       // 기존 프로필 확인
       const { data: existingProfile, error: fetchError } = await supabase
