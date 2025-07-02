@@ -251,7 +251,7 @@ function TodoApp({ user }: TodoAppProps) {
   }, [missions])
 
   // 새 미션 입력 핸들러들 메모이제이션
-  const handleNewMissionChange = useCallback((field: string, value: any) => {
+  const handleNewMissionChange = useCallback((field: string, value: string) => {
     setNewMission(prev => ({ ...prev, [field]: value }))
   }, [])
 

@@ -5,9 +5,9 @@ export const supabase = createClientComponentClient()
 
 // 캐시 관리
 class DataCache {
-  private cache = new Map<string, { data: any, timestamp: number, ttl: number }>()
+  private cache = new Map<string, { data: unknown, timestamp: number, ttl: number }>()
   
-  set(key: string, data: any, ttl: number = 300000) { // 기본 5분 TTL
+  set(key: string, data: unknown, ttl: number = 300000) { // 기본 5분 TTL
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
@@ -73,13 +73,22 @@ export interface MissionCompletion {
   completed_at: string
 }
 
+interface PendingOperation {
+  type: 'create_mission' | 'complete_mission' | 'delete_mission'
+  data: {
+    userId?: string
+    missionId?: string
+    [key: string]: unknown
+  }
+}
+
 // 배치 처리용 큐
 class BatchQueue {
-  private queue: Array<() => Promise<any>> = []
+  private queue: Array<() => Promise<void>> = []
   private processing = false
   private batchSize = 10
   
-  add(operation: () => Promise<any>) {
+  add(operation: () => Promise<void>) {
     this.queue.push(operation)
     this.process()
   }
@@ -110,9 +119,9 @@ const batchQueue = new BatchQueue()
 // API 함수들
 export const api = {
   // 프로필 생성 또는 가져오기
-  async ensureProfile(user: User) {
+  async ensureProfile(user: User): Promise<Profile> {
     const cacheKey = `profile:${user.id}`
-    let cached = dataCache.get(cacheKey)
+    const cached = dataCache.get(cacheKey) as Profile | null
     if (cached) return cached
     
     try {
@@ -125,7 +134,7 @@ export const api = {
 
       if (existingProfile && !fetchError) {
         dataCache.set(cacheKey, existingProfile)
-        return existingProfile
+        return existingProfile as Profile
       }
 
       // 프로필이 없으면 생성
@@ -144,7 +153,7 @@ export const api = {
 
       if (createError) throw createError
       dataCache.set(cacheKey, newProfile)
-      return newProfile
+      return newProfile as Profile
     } catch (error) {
       console.error('프로필 생성 오류:', error)
       throw error
@@ -152,11 +161,11 @@ export const api = {
   },
 
   // 미션 가져오기 (캐싱 적용)
-  async getUserMissions(userId: string, useCache: boolean = true) {
+  async getUserMissions(userId: string, useCache: boolean = true): Promise<UserMission[]> {
     const cacheKey = `missions:${userId}`
     
     if (useCache) {
-      const cached = dataCache.get(cacheKey)
+      const cached = dataCache.get(cacheKey) as UserMission[] | null
       if (cached) return cached
     }
     
@@ -168,20 +177,13 @@ export const api = {
     
     if (error) throw error
     
-    const result = data || []
+    const result = (data || []) as UserMission[]
     dataCache.set(cacheKey, result)
     return result
   },
 
-  // 미션 만들기 (낙관적 업데이트)
-  async createMission(mission: Omit<UserMission, 'id' | 'created_at'>) {
-    // 낙관적 업데이트를 위한 임시 ID
-    const tempMission = {
-      ...mission,
-      id: `temp_${Date.now()}`,
-      created_at: new Date().toISOString()
-    }
-    
+  // 미션 만들기
+  async createMission(mission: Omit<UserMission, 'id' | 'created_at'>): Promise<UserMission> {
     // 캐시 무효화
     dataCache.invalidatePattern(`missions:${mission.user_id}`)
     
@@ -196,19 +198,19 @@ export const api = {
       
       // 캐시 업데이트
       const cacheKey = `missions:${mission.user_id}`
-      const cachedMissions = dataCache.get(cacheKey) || []
-      dataCache.set(cacheKey, [...cachedMissions, data])
+      const cachedMissions = dataCache.get(cacheKey) as UserMission[] || []
+      dataCache.set(cacheKey, [...cachedMissions, data as UserMission])
       
-      return data
+      return data as UserMission
     } catch (error) {
-      // 낙관적 업데이트 롤백
+      // 캐시 무효화
       dataCache.invalidatePattern(`missions:${mission.user_id}`)
       throw error
     }
   },
 
   // 미션 삭제 (배치 처리)
-  async deleteMission(missionId: string) {
+  async deleteMission(missionId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       batchQueue.add(async () => {
         try {
@@ -223,7 +225,7 @@ export const api = {
           dataCache.invalidatePattern('missions:')
           dataCache.invalidatePattern('completions:')
           
-          resolve(undefined)
+          resolve()
         } catch (error) {
           reject(error)
         }
@@ -232,12 +234,12 @@ export const api = {
   },
 
   // 오늘 완료한 미션들 가져오기 (캐싱 적용)
-  async getTodayCompletions(userId: string, useCache: boolean = true) {
+  async getTodayCompletions(userId: string, useCache: boolean = true): Promise<MissionCompletion[]> {
     const today = new Date().toISOString().split('T')[0]
     const cacheKey = `completions:${userId}:${today}`
     
     if (useCache) {
-      const cached = dataCache.get(cacheKey)
+      const cached = dataCache.get(cacheKey) as MissionCompletion[] | null
       if (cached) return cached
     }
     
@@ -250,22 +252,14 @@ export const api = {
     
     if (error) throw error
     
-    const result = data || []
+    const result = (data || []) as MissionCompletion[]
     // 완료 데이터는 자주 변경되므로 짧은 TTL 적용
     dataCache.set(cacheKey, result, 60000) // 1분
     return result
   },
 
-  // 미션 완료하기 (낙관적 업데이트)
-  async completeMission(userId: string, missionId: string) {
-    // 낙관적 업데이트를 위한 임시 완료 데이터
-    const tempCompletion = {
-      id: `temp_${Date.now()}`,
-      user_id: userId,
-      mission_id: missionId,
-      completed_at: new Date().toISOString()
-    }
-    
+  // 미션 완료하기
+  async completeMission(userId: string, missionId: string): Promise<MissionCompletion> {
     try {
       const { data, error } = await supabase
         .from('mission_completions')
@@ -281,12 +275,12 @@ export const api = {
       // 캐시 업데이트
       const today = new Date().toISOString().split('T')[0]
       const cacheKey = `completions:${userId}:${today}`
-      const cachedCompletions = dataCache.get(cacheKey) || []
-      dataCache.set(cacheKey, [...cachedCompletions, data], 60000)
+      const cachedCompletions = dataCache.get(cacheKey) as MissionCompletion[] || []
+      dataCache.set(cacheKey, [...cachedCompletions, data as MissionCompletion], 60000)
       
-      return data
+      return data as MissionCompletion
     } catch (error) {
-      // 낙관적 업데이트 롤백
+      // 캐시 무효화
       const today = new Date().toISOString().split('T')[0]
       dataCache.delete(`completions:${userId}:${today}`)
       throw error
@@ -294,7 +288,7 @@ export const api = {
   },
 
   // 미션 완료 취소 (배치 처리)
-  async uncompleteMission(userId: string, missionId: string) {
+  async uncompleteMission(userId: string, missionId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       batchQueue.add(async () => {
         try {
@@ -312,7 +306,7 @@ export const api = {
           // 캐시 무효화
           dataCache.delete(`completions:${userId}:${today}`)
           
-          resolve(undefined)
+          resolve()
         } catch (error) {
           reject(error)
         }
@@ -337,7 +331,7 @@ export const api = {
   },
 
   // 네트워크 상태 확인
-  async checkConnection() {
+  async checkConnection(): Promise<boolean> {
     try {
       const { error } = await supabase.from('profiles').select('id').limit(1)
       return !error
@@ -347,21 +341,21 @@ export const api = {
   },
 
   // 일괄 동기화 (오프라인 지원)
-  async syncPendingOperations() {
+  async syncPendingOperations(): Promise<void> {
     // 오프라인 상태에서 저장된 작업들을 동기화
     const pendingOps = localStorage.getItem('pendingOperations')
     if (!pendingOps) return
     
     try {
-      const operations = JSON.parse(pendingOps)
-      await Promise.all(operations.map((op: any) => {
+      const operations = JSON.parse(pendingOps) as PendingOperation[]
+      await Promise.all(operations.map((op) => {
         switch (op.type) {
           case 'create_mission':
-            return api.createMission(op.data)
+            return api.createMission(op.data as Omit<UserMission, 'id' | 'created_at'>)
           case 'complete_mission':
-            return api.completeMission(op.data.userId, op.data.missionId)
+            return api.completeMission(op.data.userId as string, op.data.missionId as string)
           case 'delete_mission':
-            return api.deleteMission(op.data.missionId)
+            return api.deleteMission(op.data.missionId as string)
           default:
             return Promise.resolve()
         }

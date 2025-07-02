@@ -25,7 +25,7 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
     // 메모리 사용량 모니터링
     const monitorMemory = () => {
       if ('memory' in performance) {
-        const memory = (performance as any).memory
+        const memory = (performance as { memory: { usedJSHeapSize: number; totalJSHeapSize: number } }).memory
         const memoryUsage = memory.usedJSHeapSize / memory.totalJSHeapSize
         
         // 메모리 사용량이 90% 이상이면 경고
