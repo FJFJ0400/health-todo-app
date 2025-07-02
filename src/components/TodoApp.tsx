@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase, api, UserMission, MissionCompletion } from '../../lib/supabase'
 import { User } from '@supabase/supabase-js'
 
@@ -29,21 +29,16 @@ export default function TodoApp({ user }: TodoAppProps) {
     sticker: '⭐'
   })
 
-  useEffect(() => {
-    loadMissions()
-    loadTodayCompletions()
-  }, [])
-
-  const loadMissions = async () => {
+  const loadMissions = useCallback(async () => {
     try {
       const data = await api.getUserMissions(user.id)
       setMissions(data)
     } catch (error) {
       console.error('미션 로드 오류:', error)
     }
-  }
+  }, [user.id])
 
-  const loadTodayCompletions = async () => {
+  const loadTodayCompletions = useCallback(async () => {
     try {
       const data = await api.getTodayCompletions(user.id)
       setCompletions(data)
@@ -52,7 +47,18 @@ export default function TodoApp({ user }: TodoAppProps) {
       console.error('완료 기록 로드 오류:', error)
       setLoading(false)
     }
-  }
+  }, [user.id])
+
+  useEffect(() => {
+    // 병렬로 데이터 로드하여 성능 향상
+    Promise.all([
+      loadMissions(),
+      loadTodayCompletions()
+    ]).catch(error => {
+      console.error('데이터 로드 오류:', error)
+      setLoading(false)
+    })
+  }, [loadMissions, loadTodayCompletions])
 
   const handleAddMission = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,14 +108,14 @@ export default function TodoApp({ user }: TodoAppProps) {
     }
   }
 
-  const isMissionCompleted = (missionId: string) => {
+  const isMissionCompleted = useCallback((missionId: string) => {
     return completions.some(c => c.mission_id === missionId)
-  }
+  }, [completions])
 
-  const getProgress = () => {
+  const progress = useMemo(() => {
     if (missions.length === 0) return 0
     return Math.round((completions.length / missions.length) * 100)
-  }
+  }, [missions.length, completions.length])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -143,12 +149,12 @@ export default function TodoApp({ user }: TodoAppProps) {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">오늘의 진행률</h2>
-            <span className="text-2xl font-bold text-blue-600">{getProgress()}%</span>
+            <span className="text-2xl font-bold text-blue-600">{progress}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div 
               className="bg-blue-600 h-3 rounded-full transition-all duration-300"
-              style={{ width: `${getProgress()}%` }}
+              style={{ width: `${progress}%` }}
             ></div>
           </div>
           <p className="text-sm text-gray-600 mt-2">
