@@ -5,6 +5,9 @@ import { supabase, api } from '../../lib/supabase'
 import { User } from '@supabase/supabase-js'
 import AuthComponent from '../components/Auth'
 import TodoApp from '../components/TodoApp'
+import ErrorBoundary from '../components/ErrorBoundary'
+import LoadingSpinner from '../components/LoadingSpinner'
+import PerformanceOptimizer from '../components/PerformanceOptimizer'
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null)
@@ -54,12 +57,18 @@ export default function Home() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
-      </div>
-    )
+    return <LoadingSpinner fullScreen size="lg" text="앱을 불러오는 중..." />
   }
 
-  return user ? <TodoApp user={user} /> : <AuthComponent />
+  return (
+    <ErrorBoundary>
+      {user ? (
+        <PerformanceOptimizer userId={user.id}>
+          <TodoApp user={user} />
+        </PerformanceOptimizer>
+      ) : (
+        <AuthComponent />
+      )}
+    </ErrorBoundary>
+  )
 }
