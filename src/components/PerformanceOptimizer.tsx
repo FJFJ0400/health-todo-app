@@ -124,13 +124,11 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
 export function LazyImage({ 
   src, 
   alt, 
-  className = '', 
-  placeholder = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNjY2MiLz48L3N2Zz4=' 
+  className = ''
 }: {
   src: string
   alt: string
   className?: string
-  placeholder?: string
 }) {
   const imgRef = useRef<HTMLImageElement>(null)
 
@@ -158,7 +156,7 @@ export function LazyImage({
   return (
     <img
       ref={imgRef}
-      src={placeholder}
+      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNjY2MiLz48L3N2Zz4="
       alt={alt}
       className={className}
       loading="lazy"
