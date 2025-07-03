@@ -11,7 +11,6 @@ interface PerformanceOptimizerProps {
 export default function PerformanceOptimizer({ userId, children }: PerformanceOptimizerProps) {
   const cleanupRef = useRef<Array<() => void>>([])
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const observerRef = useRef<IntersectionObserver | null>(null)
 
   // 메모리 정리 함수
   const addCleanup = useCallback((cleanupFn: () => void) => {
@@ -78,27 +77,6 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
       window.removeEventListener('offline', handleOffline)
     })
 
-    // 이미지 지연 로딩을 위한 Intersection Observer
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const img = entry.target as HTMLImageElement
-            if (img.dataset.src) {
-              img.src = img.dataset.src
-              img.removeAttribute('data-src')
-              observerRef.current?.unobserve(img)
-            }
-          }
-        })
-      },
-      { rootMargin: '50px' }
-    )
-
-    addCleanup(() => {
-      observerRef.current?.disconnect()
-    })
-
     return () => {
       // 모든 cleanup 함수 실행
       cleanupRef.current.forEach(cleanup => cleanup())
@@ -120,50 +98,6 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
   return <>{children}</>
 }
 
-// 지연 로딩 이미지 컴포넌트
-export function LazyImage({ 
-  src, 
-  alt, 
-  className = ''
-}: {
-  src: string
-  alt: string
-  className?: string
-}) {
-  const imgRef = useRef<HTMLImageElement>(null)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && imgRef.current) {
-            const img = imgRef.current
-            img.src = src
-            observer.unobserve(img)
-          }
-        })
-      },
-      { rootMargin: '50px' }
-    )
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current)
-    }
-
-    return () => observer.disconnect()
-  }, [src])
-
-  return (
-    <img
-      ref={imgRef}
-      src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNjY2MiLz48L3N2Zz4="
-      alt={alt}
-      className={className}
-      loading="lazy"
-    />
-  )
-}
-
 // 디바운스 훅
 export function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
@@ -182,7 +116,7 @@ export function useDebounce<T>(value: T, delay: number): T {
 }
 
 // 쓰로틀 훅
-export function useThrottle<T extends (...args: any[]) => any>(
+export function useThrottle<T extends (...args: unknown[]) => unknown>(
   func: T,
   delay: number
 ): T {
@@ -209,4 +143,5 @@ export function useThrottle<T extends (...args: any[]) => any>(
     }) as T,
     [func, delay]
   )
-} 
+}
+
