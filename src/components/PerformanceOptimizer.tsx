@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useRef, useState } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { api } from '../../lib/supabase'
 
 interface PerformanceOptimizerProps {
@@ -23,8 +23,8 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
 
     // 메모리 사용량 모니터링
     const monitorMemory = () => {
-      if ('memory' in performance) {
-        const memory = (performance as { memory: { usedJSHeapSize: number; totalJSHeapSize: number } }).memory
+      if ('memory' in performance && performance.memory) {
+        const memory = performance.memory as { usedJSHeapSize: number; totalJSHeapSize: number }
         const memoryUsage = memory.usedJSHeapSize / memory.totalJSHeapSize
         
         // 메모리 사용량이 90% 이상이면 경고
@@ -44,13 +44,11 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
       }
     })
 
-    // 페이지 가시성 변경 감지 (백그라운드에서 리소스 절약)
+    // 페이지 가시성 변경 감지
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // 페이지가 숨겨지면 캐시 정리 및 리소스 절약
         api.cache.clear()
       } else {
-        // 페이지가 다시 보이면 데이터 사전 로드
         api.cache.preloadUserData(userId)
       }
     }
@@ -96,52 +94,4 @@ export default function PerformanceOptimizer({ userId, children }: PerformanceOp
   }, [userId])
 
   return <>{children}</>
-}
-
-// 디바운스 훅
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-
-  return debouncedValue
-}
-
-// 쓰로틀 훅
-export function useThrottle<T extends (...args: unknown[]) => unknown>(
-  func: T,
-  delay: number
-): T {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const lastExecutedRef = useRef<number>(0)
-
-  return useCallback(
-    ((...args: Parameters<T>) => {
-      const now = Date.now()
-      
-      if (now - lastExecutedRef.current >= delay) {
-        lastExecutedRef.current = now
-        return func(...args)
-      } else {
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current)
-        }
-        
-        timeoutRef.current = setTimeout(() => {
-          lastExecutedRef.current = Date.now()
-          func(...args)
-        }, delay - (now - lastExecutedRef.current))
-      }
-    }) as T,
-    [func, delay]
-  )
-}
-
+} 
